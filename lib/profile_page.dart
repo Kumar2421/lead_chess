@@ -90,7 +90,6 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> fetchProfilePicturePath(String userId, String email) async {
     try {
       final response = await http.post(
-        //Uri.parse('https://leadproduct.000webhostapp.com/chessApi/fetch_profile_picture.php'),
         Uri.parse('https://schmidivan.com/Esakki/ChessGame/fetch_profile_picture'),
         body: {
           'user_id': userId,
@@ -106,7 +105,6 @@ class _ProfilePageState extends State<ProfilePage> {
           final String imagePath = responseData['imagePath'];
 
           // Assuming imagePath contains the file name only, concatenate it with the base URL
-         // const String baseUrl = 'https://leadproduct.000webhostapp.com/chessApi/';
           const String baseUrl = 'https://schmidivan.com/Esakki/ChessGame/';
           final String imageUrl = baseUrl + imagePath;
 
@@ -115,6 +113,10 @@ class _ProfilePageState extends State<ProfilePage> {
             _profilePicturePath = imageUrl; // Update _profilePicturePath with the complete URL
             userController.setProfilePicturePath(imageUrl);
           });
+
+          // Store the image URL in shared preferences
+          final SharedPreferences prefs = await SharedPreferences.getInstance();
+          await prefs.setString('profile_picture_path', imageUrl);
         } else {
           // Handle case where no image path is found
           setState(() {
@@ -130,6 +132,7 @@ class _ProfilePageState extends State<ProfilePage> {
       print('Error fetching image: $e');
     }
   }
+
   void deleteProfileImage() async {
     try {
       Users currentUser = Get.find<CurrentUser>().users;
@@ -281,8 +284,7 @@ class _ProfilePageState extends State<ProfilePage> {
                              onTap: () {
                                _showImageOptionsDialog(context);
                              },
-                             child: _profilePicturePath != null
-                                 ?
+                             child: _profilePicturePath != null?
                              // Stack(
                              //   children: [
                                  CircleAvatar(
@@ -294,16 +296,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                      });
                                    },
                                  )
-                               //   Positioned(
-                               //     bottom: 0,
-                               //     right: 0,
-                               //     child: IconButton(
-                               //       icon: Icon(Icons.delete,),
-                               //       onPressed: deleteProfileImage,
-                               //     ),
-                               //   ),
-                               // ],
-                             //)
+
                                  : const CircleAvatar(
                                radius: 50.0,
                                child: Icon(Icons.person),

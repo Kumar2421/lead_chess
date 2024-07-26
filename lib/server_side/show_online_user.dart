@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:chess_game/screen/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../games/choose_color_screen2.dart';
 import '../games/color_option2.dart';
+import '../main.dart';
 
 class OnlineUser {
   final String username;
@@ -112,6 +114,27 @@ class _PlayOnlineState extends State<PlayOnline> {
       case 'game_state':
         print("Starting stage of game state receiving");
         break;
+      case 'rematch_request':
+        final opponent = decodedMessage['opponent'] as String?;
+        if (opponent != null) {
+          _showRematchDialog(opponent);
+        } else {
+          print('Error: No opponent found in rematch request message');
+        }
+        break;
+      case 'rematch_response':
+        final response = decodedMessage['response'] as String?;
+        if (response != null) {
+          if (response == 'accepted') {
+            _startNewGame();
+          } else {
+            _showRejectionDialog();
+          }
+        } else {
+          print('Error: No response found in rematch response message');
+        }
+        break;
+
       case 'user_connected':
         final connectedUserId = decodedMessage['data']['id'];
         final connectedUserName = decodedMessage['data']['name'];
@@ -172,11 +195,15 @@ class _PlayOnlineState extends State<PlayOnline> {
       ),
     );
   }
-
   void showGameInvitation(String opponent) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        // Automatically close the dialog after 5 seconds
+        Future.delayed(Duration(seconds: 12), () {
+          Navigator.pop(context);
+        });
+
         return AlertDialog(
           title: Text('Game Invitation'),
           content: Text('$opponent has invited you to a game. Do you accept?'),
@@ -213,6 +240,7 @@ class _PlayOnlineState extends State<PlayOnline> {
   }
 
   void sendInvitation(String opponent) {
+    final String? img= prefs.getString('profile_picture_path');
     setState(() {
       inviteStatus[opponent] = true;
     });
@@ -223,6 +251,7 @@ class _PlayOnlineState extends State<PlayOnline> {
         'opponent': opponent,
         'bettingAmount': widget.bettingAmount,
         'sessionToken': userData['session_token'] ?? '',
+        'user_image':img,
       }));
     }
   }
@@ -252,6 +281,73 @@ class _PlayOnlineState extends State<PlayOnline> {
     print('Sent matchmaking request to $opponent');
   }
 
+  void _showRematchDialog(String opponent) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // Automatically close the dialog after 5 seconds
+        Future.delayed(Duration(seconds: 12), () {
+          Navigator.pop(context);
+        });
+
+        return AlertDialog(
+          title: Text("Rematch Request"),
+          content: Text("$opponent has requested a rematch. Do you accept?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                sendRematchResponse(opponent, 'accepted');
+                Navigator.pop(context);
+                _startNewGame();
+              },
+              child: Text("Accept"),
+            ),
+            TextButton(
+              onPressed: () {
+                sendRematchResponse(opponent, 'rejected');
+                Navigator.pop(context);
+              },
+              child: Text("Reject"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _startNewGame() {
+    Navigator.push(context, MaterialPageRoute(builder:(context)=>ChooseColorScreen2()));
+  }
+  void _showRejectionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Text("Rematch Rejected"),
+        content: Text("Your rematch request has been rejected."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+  void sendRematchResponse(String opponent, String response) {
+    if (opponent.isEmpty) {
+      print('Error: Opponent name is empty.');
+      return;
+    }
+
+    for (var channel in _channels) {
+      channel.sink.add(json.encode({
+        'type': 'rematch_response',
+        'response': response,
+        'opponent': opponent,
+        'sessionToken': userData['session_token'] ?? '',
+      }));
+    }
+  }
   @override
   void dispose() {
     for (var channel in _channels) {
@@ -265,12 +361,16 @@ class _PlayOnlineState extends State<PlayOnline> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Play Online'),
+        leading: IconButton(
+            icon:Icon(Icons.arrow_back), onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (context)=>HomeScreen()));
+              },
+        ),
       ),
       body: Stack(
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/Designer.jpeg',
+              'assets/c3.png',
               fit: BoxFit.cover,
             ),
           ),

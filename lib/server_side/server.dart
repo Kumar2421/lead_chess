@@ -137,6 +137,12 @@ void handleClientMessage(String username, Map<String, dynamic> receivedMessage) 
     case 'start_matchmaking':
       startMatchmaking();
       break;
+    case 'rematch_request':
+      handleRematchRequest(username, receivedMessage);
+      break;
+    case 'rematch_response':
+      handleRematchResponse(username, receivedMessage);
+      break;
     case 'invite_user':
       handleInviteUser(username, receivedMessage);
       break;
@@ -172,7 +178,38 @@ void handleMatchResponse(String username, Map<String, dynamic> message) {
     }));
   }
 }
+void handleRematchRequest(String username, Map<String, dynamic> message) {
+  final opponent = message['opponent'] as String?;
+  if (opponent != null && onlinePlayers.containsKey(opponent)) {
+    onlinePlayers[opponent]?.add(json.encode({
+      'type': 'rematch_request',
+      'opponent': username,
+      'sessionToken': message['sessionToken'] ?? '',
+    }));
+  } else {
+    print('Error: Opponent not found or not online');
+  }
+}
 
+void handleRematchResponse(String username, Map<String, dynamic> message) {
+  final response = message['response'] as String?;
+  final opponent = message['opponent'] as String?;
+
+  if (opponent != null && onlinePlayers.containsKey(opponent)) {
+    onlinePlayers[opponent]?.add(json.encode({
+      'type': 'rematch_response',
+      'response': response,
+      'opponent': username,
+      'sessionToken': message['sessionToken'] ?? '',
+    }));
+
+    if (response == 'accept') {
+      startGameSession(username, opponent);
+    }
+  } else {
+    print('Error: Opponent not found or not online');
+  }
+}
 void startGameSession(String player1, String player2) async {
   final random = Random();
   final isPlayer1Black = random.nextBool();
@@ -184,11 +221,11 @@ void startGameSession(String player1, String player2) async {
   onlinePlayers[player2]?.add(json.encode({'type': 'match_found', 'opponent': player1}));
 
   if (isPlayer1Black) {
-    onlinePlayers[player1]?.add(json.encode({'type': 'color_selection', 'color': 'black'}));
-    onlinePlayers[player2]?.add(json.encode({'type': 'color_selection', 'color': 'white'}));
+    onlinePlayers[player1]?.add(json.encode({'type': 'color_selection', 'color': 'Black'}));
+    onlinePlayers[player2]?.add(json.encode({'type': 'color_selection', 'color': 'White'}));
   } else {
-    onlinePlayers[player1]?.add(json.encode({'type': 'color_selection', 'color': 'white'}));
-    onlinePlayers[player2]?.add(json.encode({'type': 'color_selection', 'color': 'black'}));
+    onlinePlayers[player1]?.add(json.encode({'type': 'color_selection', 'color': 'White'}));
+    onlinePlayers[player2]?.add(json.encode({'type': 'color_selection', 'color': 'Black'}));
   }
 }
 
@@ -239,12 +276,13 @@ void broadcastGameStateToPlayer(String player, String opponent, Map<String, dyna
 void handleInviteUser(String username, Map<String, dynamic> message) {
   final opponent = message['opponent'] as String?;
   final bettingAmount = message['bettingAmount'] as String?;
-
+  final userImage = message['user_image'] as String?;
   if (opponent != null && onlinePlayers.containsKey(opponent)) {
     onlinePlayers[opponent]?.add(json.encode({
       'type': 'game_invitation',
       'opponent': username,
       'bettingAmount': bettingAmount,
+      'user_image': userImage,
     }));
     print('Sent game invitation from $username to $opponent');
   } else {
@@ -346,7 +384,7 @@ void handleWebSocketDisconnection(String username, String sessionToken) async {
 
         // Delete betting amount from the database
         final response = await http.post(
-          Uri.parse('https://schmidivan.com/senthil/_ChessGame/delete_bettingamount.php'),
+          Uri.parse('https://schmidivan.com/senthil/_ChessGame/delete_bettingamount'),
           body: jsonEncode({'username': username}),
           headers: {'Content-Type': 'application/json'},
         );

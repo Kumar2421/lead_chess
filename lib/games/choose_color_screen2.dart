@@ -28,8 +28,9 @@ class _ChooseColorScreenState extends State<ChooseColorScreen2> {
     final color = prefs.getString('selected_color');
 
     if (color != null) {
-      logic.args.asBlack = (color == 'black');
+      logic.args.asBlack = (color == 'Black');
       logic.start();
+      print('$color');
     } else {
       // If no color is found, you can handle it accordingly (e.g., assign a random color or show an error)
       final random = Random();

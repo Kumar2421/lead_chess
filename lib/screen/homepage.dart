@@ -58,7 +58,7 @@ class _HomepageState extends State<Homepage> with TickerProviderStateMixin{
   int totalRewardAmount = 0;
   int totalMoney = 0;
   int rewardedCount = 0;
-
+  bool _showImage = true;
   void simulateDollarImageClick() {
     runAddToCartAnimation!(widgetKey);
   }
@@ -176,17 +176,20 @@ class _HomepageState extends State<Homepage> with TickerProviderStateMixin{
     _createRewardedAd();
     insertIntoCoinsTable(currentUser.userId, totalRewardAmount, totalMoney);
     fetchProfilePicturePath(currentUser.userId, currentUser.email);
-    //     .then((_) {
-    //   setState(() {
-    //     _profilePicturePath = _profilePicturePath;
-    //   });
-    // });
+
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitDown,
       DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeRight,
       DeviceOrientation.landscapeLeft,
     ]);
+
+    // Set a timer to hide the image after 3 seconds
+    Timer(Duration(seconds: 3), () {
+      setState(() {
+        _showImage = false;
+      });
+    });
   }
   RewardedAd? _rewardedAd;
   int _numRewardedLoadAttempts = 0;
@@ -338,24 +341,7 @@ class _HomepageState extends State<Homepage> with TickerProviderStateMixin{
                                   height: 50,
                                   width: 50,
                                   child:
-                                  // Obx(() {
-                                  //   return userController.profilePicturePath.value.isNotEmpty
-                                  //       ? CircleAvatar(
-                                  //     radius: 50.0,
-                                  //     backgroundImage: NetworkImage(userController.profilePicturePath.value),
-                                  //       onBackgroundImageError: (_, __) {
-                                  //         setState(() {
-                                  //           userController.deleteProfilePicturePath();
-                                  //          // userController.profilePicturePath.value.isEmpty;
-                                  //         //  _profilePicturePath = null;
-                                  //         });
-                                  //       },
-                                  //   )
-                                  //       : CircleAvatar(
-                                  //     radius: 50.0,
-                                  //     child: Icon(Icons.person),
-                                  //   );
-                                  // }),
+
                                   _profilePicturePath != null
                                       ? CircleAvatar(
                                     radius: 50.0,
