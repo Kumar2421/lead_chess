@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>810797163247-mvcfe3ioqfhktqs0nf9oi8anubm59smk.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.810797163247-mvcfe3ioqfhktqs0nf9oi8anubm59smk</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>810797163247-hsphgdsqh749uf36114n2c3sm0dr1sbl.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDxpwEkPP1UsCeqytNrt4RLIdBB52HQHA4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>810797163247</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.chessGame</string>
+	<key>PROJECT_ID</key>
+	<string>chess-game-6b5b8</string>
+	<key>STORAGE_BUCKET</key>
+	<string>chess-game-6b5b8.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:810797163247:ios:b122e9910db94fa70b311a</string>
+</dict>
+</plist>
