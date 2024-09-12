@@ -19,7 +19,7 @@ const Duration pongTimeout = Duration(seconds: 80);
 
 const String authUrl = 'https://schmidivan.com/Esakki/ChessGame/authentication';
 const String onlineStatusUrl = 'https://schmidivan.com/Esakki/ChessGame/onlinestatus';
-final List<int> dartServerPorts = [3003];
+final List<int> dartServerPorts = [3007];
 
 Future<void> main() async {
   for (var port in dartServerPorts) {
@@ -29,7 +29,7 @@ Future<void> main() async {
 
 Future<void> runWebSocketServer(int port) async {
   try {
-    final server = await HttpServer.bind('0.0.0.0',port);
+    final server = await HttpServer.bind('192.168.29.209',port);
     print('Dart WebSocket server running on port $port');
 
     // Print server IP address
@@ -766,7 +766,7 @@ void handleWebSocketDisconnection(String username, String sessionToken) async {
 Future<void> deleteBettingAmountFromDatabase(String username) async {
   try {
     final response = await http.post(
-      Uri.parse('https://schmidivan.com/Esakki/ChessGame/delete_bettingamount'),
+      Uri.parse('https://schmidivan.com/Esakki/ChessGame/delete_bettingamount_andtime'),
       body: jsonEncode({'username': username}),
       headers: {'Content-Type': 'application/json'},
     );
@@ -822,10 +822,9 @@ Future<User?> authenticateUser(String sessionToken, WebSocket socket) async {
   }
   return null;
 }
-
 void broadcastOnlineUsers() async {
-  // Fetch betting amounts for all online users
-  final bettingAmounts = await fetchBettingAmountsFromServer(
+  // Fetch betting data (amounts and times) for all online users
+  final bettingData = await fetchBettingDataFromServer(
       userSessions.values
           .where((user) => onlinePlayers.containsKey(user.username))
           .map((user) => user.username)
@@ -833,24 +832,27 @@ void broadcastOnlineUsers() async {
   );
 
   // Use a Set to automatically remove duplicates
-  final onlineUsernamesSet = bettingAmounts.keys.toSet();
+  final onlineUsernamesSet = bettingData.keys.toSet();
 
   // Make a copy of onlinePlayers entries to avoid modifying the map while iterating
   final channelsToSend = List.from(onlinePlayers.entries);
 
-  print('Broadcasting online users with betting amounts: $onlineUsernamesSet, $bettingAmounts');
+  print('Broadcasting online users with betting data: $onlineUsernamesSet, $bettingData');
 
   for (final entry in channelsToSend) {
     final ownUsername = entry.key;
     final channel = entry.value;
 
-    // Determine the betting amount of the current user
-    final ownBettingAmount = bettingAmounts[ownUsername];
+    // Determine the betting data of the current user
+    final ownBettingData = bettingData[ownUsername];
 
-    // Create a new set of usernames with the same betting amount, excluding the owner's username
+    // Create a new set of usernames with the same betting amount and selected time, excluding the owner's username
     final usernamesToSend = onlineUsernamesSet
-        .where((username) => username != ownUsername && bettingAmounts[username] == ownBettingAmount)
-        .toSet();
+        .where((username) =>
+    username != ownUsername &&
+        bettingData[username]?['betting_amount'] == ownBettingData?['betting_amount'] &&
+        bettingData[username]?['selected_time'] == ownBettingData?['selected_time']
+    ).toSet();
 
     // Add usernames from 'other_players_for_matching' list as online users
     usernamesToSend.addAll(matchmakingQueue.where((username) => username != ownUsername));
@@ -858,7 +860,7 @@ void broadcastOnlineUsers() async {
     final message = {
       'type': 'online_users',
       'usernames': usernamesToSend.toList(), // Convert set back to a list
-      'betting_amounts': bettingAmounts,
+      'betting_data' : bettingData,
       'other_players_for_matching': matchmakingQueue,
     };
 
@@ -878,35 +880,39 @@ void broadcastOnlineUsers() async {
     }
   }
 }
-
-
-Future<Map<String, int>> fetchBettingAmountsFromServer(List<String> usernames) async {
-  final bettingAmounts = <String, int>{};
+Future<Map<String, Map<String, dynamic>>> fetchBettingDataFromServer(List<String> usernames) async {
+  final bettingData = <String, Map<String, dynamic>>{};
   try {
     final response = await http.post(
-      Uri.parse('https://schmidivan.com/Esakki/ChessGame/fetch_bettingamount'), // Replace with your PHP script URL
+      Uri.parse('https://schmidivan.com/Esakki/ChessGame/fetch_bettingamount_andtime'), // Replace with your PHP script URL
       body: {'usernames': json.encode(usernames)},
     );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
+
       if (data['success'] == true) {
-        final Map<String, dynamic> bettingAmountsData = data['betting_amounts'];
-        bettingAmountsData.forEach((username, amount) {
-          bettingAmounts[username] = int.parse(amount.toString());
+        // Ensure that betting_data is treated as a Map<String, dynamic>
+        final bettingDataResponse = data['betting_data'] as Map<String, dynamic>;
+
+        bettingDataResponse.forEach((username, userData) {
+          final userBettingData = userData as Map<String, dynamic>;
+          bettingData[username] = {
+            'betting_amount': int.parse(userBettingData['betting_amount'].toString()),
+            'selected_time': int.parse(userBettingData['selected_time'].toString()),
+          };
         });
       } else {
-        print('Failed to fetch betting amounts: ${data['message']}');
+        print('Failed to fetch betting data: ${data['message']}');
       }
     } else {
-      print('Failed to fetch betting amounts. Status code: ${response.statusCode}');
+      print('Failed to fetch betting data. Status code: ${response.statusCode}');
     }
   } catch (e) {
-    print('Error fetching betting amounts: $e');
+    print('Error fetching betting data: $e');
   }
-  return bettingAmounts;
+  return bettingData;
 }
-
 
 void updateOnlineStatus(String username, bool isOnline) async {
   try {
