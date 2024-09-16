@@ -48,7 +48,12 @@ class _PlayOnlineState extends State<PlayOnline> {
   void initState() {
     super.initState();
     webSocketManager = GetIt.instance<WebSocketManager>(); // Retrieve the instance here
+<<<<<<< HEAD
     initPrefsAndSetupWebSocket(); // Initialize shared preferences and setup WebSocket
+=======
+    initPrefsAndSetupWebSocket();
+    // Initialize shared preferences and setup WebSocket
+>>>>>>> d93d3c4 (Initial commit)
   }
 
   Future<void> initPrefsAndSetupWebSocket() async {
@@ -311,12 +316,23 @@ class _PlayOnlineState extends State<PlayOnline> {
     matchmakingFailedCalled = true;
   }
 
+<<<<<<< HEAD
   void sendMatchmakingRequest(String opponent) {
+=======
+
+  Future<void> sendMatchmakingRequest(String opponent) async {
+    final prefs = await SharedPreferences.getInstance();
+    int? storedTime = prefs.getInt('selected_time');
+>>>>>>> d93d3c4 (Initial commit)
      webSocketManager.send(json.encode({
         'type': 'invite_user', // WebSocket server message type
         'opponent': opponent,
         'bettingAmount': widget.bettingAmount,
         'sessionToken': userData['session_token'] ?? '',
+<<<<<<< HEAD
+=======
+        'time':storedTime,
+>>>>>>> d93d3c4 (Initial commit)
       }));
     //webSocketManager.send(message);
     //}

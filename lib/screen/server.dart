@@ -19,29 +19,9 @@ const Duration pongTimeout = Duration(seconds: 80);
 
 const String authUrl = 'https://schmidivan.com/Esakki/ChessGame/authentication';
 const String onlineStatusUrl = 'https://schmidivan.com/Esakki/ChessGame/onlinestatus';
-final List<int> dartServerPorts = [3007];
+final List<int> dartServerPorts = [3003];
 
-void main() {
-  runZonedGuarded(() async {
-    // Your server startup logic
-    await startServer();
-  }, (error, stackTrace) {
-    // Log the error
-    print('Unhandled error occurred: $error');
-    print('Stack trace: $stackTrace');
-
-    // Restart the server after a delay
-    Future.delayed(const Duration(seconds: 5), () {
-      print('Restarting the server...');
-      main();  // Restart the server by recalling main
-    });
-  });
-}
-
-Future<void> startServer() async {
-  // Simulating your server logic
-  final dartServerPorts = [3007];
-
+Future<void> main() async {
   for (var port in dartServerPorts) {
     await runWebSocketServer(port);
   }
@@ -49,28 +29,33 @@ Future<void> startServer() async {
 
 Future<void> runWebSocketServer(int port) async {
   try {
-    final server = await HttpServer.bind('192.168.29.209', port,shared: true);
+    final server = await HttpServer.bind('0.0.0.0',port);
     print('Dart WebSocket server running on port $port');
 
-    // Listen to requests and handle WebSocket connections
+    // Print server IP address
+    final ipAddresses = await _getLocalIPAddresses();
+    print('Server IP addresses: ${ipAddresses.join(', ')}');
+
     server.listen((HttpRequest request) async {
       if (WebSocketTransformer.isUpgradeRequest(request)) {
         handleWebSocket(request);
+        //startPeriodicCleanup();
+        if (request.uri.path == '/ws') {
+          WebSocket socket = await WebSocketTransformer.upgrade(request);
+          //handleping(socket);
+
+        }
       } else {
         handleHttpRequest(request);
       }
     });
 
-  } catch (e, stackTrace) {
-    print('Error in server: $e');
-    print('Stack trace: $stackTrace');
-
-    // In case of a major error, force server restart
-    Future.delayed(const Duration(seconds: 5), () {
-      main(); // Restart the server
-    });
+    startMatchmaking();
+  } catch (e) {
+    print('Error connecting to MySQL: $e');
   }
 }
+
 Future<List<String>> _getLocalIPAddresses() async {
   final interfaces = await NetworkInterface.list();
   List<String> ipAddresses = [];
@@ -310,11 +295,11 @@ Future<void> handleMatchmakingFailed(String username, WebSocket socket) async {
 
   // List of random Indian player names
   final indianPlayerNames = [
-    'Ananya', 'Aarav', 'Vihaan', 'Ishaan', 'arun', 'Rohan', 'Neha', 'Arjun', 'sriprasath', 'Rahul',
-    'Siddharth', 'navin', 'Karan', 'Mira', 'kumar', 'Nikhil', 'Saanvi', 'Aryan', 'surya', 'Dev',
-    'prakash', 'Vivaan', 'karthi', 'Rudra', 'Tara', 'Vikram', 'Priya', 'Kabir', 'Meera', 'Yash',
-    'Simran', 'Aditya', 'Gauri', 'Nitin', 'Ishita', 'Rakesh', 'Shruti', 'Manav', 'Sai', 'Kunal',
-    'Swetha', 'Rajesh', 'Harsha', 'Vijay', 'Sunita', 'Harsh', 'Nidhi', 'Raj', 'Anjali', 'Amit', 'Reksha'
+    'Ananya', 'Aarav', 'Vihaan', 'Ishaan', 'Aditi', 'Rohan', 'Neha', 'Arjun', 'Kavya', 'Rahul',
+    'Siddharth', 'Riya', 'Karan', 'Mira', 'Anika', 'Nikhil', 'Saanvi', 'Aryan', 'Pooja', 'Dev',
+    'Lakshmi', 'Vivaan', 'Sneha', 'Rudra', 'Tara', 'Vikram', 'Priya', 'Kabir', 'Meera', 'Yash',
+    'Simran', 'Aditya', 'Gauri', 'Nitin', 'Ishita', 'Rakesh', 'Shruti', 'Manav', 'Pallavi', 'Kunal',
+    'Leela', 'Rajesh', 'Nisha', 'Vijay', 'Sunita', 'Harsh', 'Nidhi', 'Raj', 'Anjali', 'Amit', 'Rekha'
   ];
 
 
@@ -333,7 +318,7 @@ Future<void> handleMatchmakingFailed(String username, WebSocket socket) async {
 
   activePlayers.add(username);
   final isPlayer1Black = randomColor == 'Black';
-  print(aiOpponent);
+  print("$aiOpponent");
   print("$isPlayer1Black");
   final gameSession = GameSession(username, aiOpponent, isPlayer1Black);
   gameSession.start();
@@ -365,16 +350,13 @@ void startGameSession(String player1, String player2) {
   final random = Random();
   final isPlayer1Black = random.nextBool();
 
-  // Create and start a new game session
   final gameSession = GameSession(player1, player2, isPlayer1Black);
   gameSession.start();
   print("$gameSession");
 
-  // Notify both players that a match is found
   onlinePlayers[player1]?.add(json.encode({'type': 'match_found', 'opponent': player2}));
   onlinePlayers[player2]?.add(json.encode({'type': 'match_found', 'opponent': player1}));
 
-  // Assign colors to both players and notify them
   if (isPlayer1Black) {
     onlinePlayers[player1]?.add(json.encode({'type': 'color_selection', 'color': 'Black'}));
     onlinePlayers[player2]?.add(json.encode({'type': 'color_selection', 'color': 'White'}));
@@ -383,34 +365,34 @@ void startGameSession(String player1, String player2) {
     onlinePlayers[player2]?.add(json.encode({'type': 'color_selection', 'color': 'Black'}));
   }
 
-  // Add players to active players list
+  // Ensure players are added to active players
   activePlayers.add(player1);
+  print("$activePlayers");
+
   activePlayers.add(player2);
-  print("Active players: $activePlayers");
-
-  // Send updated game session list only to player1 and player2
-  sendGameSessionUserList(onlinePlayers[player1]!, player1);  // Send to player1
-  sendGameSessionUserList(onlinePlayers[player2]!, player2);  // Send to player2
+  print("$activePlayers");
+  // Send updated game session list to all connected clients
+  onlinePlayers.forEach((_, channel) {
+    sendGameSessionUserList(channel);  // Assuming channel is the WebSocket connection
+  });
 }
-
-void sendGameSessionUserList(WebSocket socket, String username) {
-  // Only send relevant sessions for this user, not all active sessions
-  final List<Map<String, String>> relevantSessions = gameSessions.entries
-      .where((entry) => entry.value.player1 == username || entry.value.player2 == username)
-      .map((entry) => {
-    'player1': entry.value.player1,
-    'player2': entry.value.player2,
+void sendGameSessionUserList(WebSocket socket) {
+  // Create a list of active game sessions
+  final List<Map<String, String>> sessions = gameSessions.entries.map((entry) {
+    return {
+      'player1': entry.value.player1,
+      'player2': entry.value.player2,
+    };
   }).toList();
 
   // Send the active game sessions list to the client
   sendMessage(socket, {
     'type': 'active_game_sessions',
-    'sessions': relevantSessions,
+    'sessions': sessions,
   });
 
-  print('Sent relevant game sessions to the client: $relevantSessions');
+  print('Sent active game sessions to the client: $sessions');
 }
-
 
 void handlePlayerStatus(String username, Map<String, dynamic> message) {
   final status = message['status'] as String?;
@@ -524,13 +506,12 @@ void game_end(String username, [Map<String, dynamic>? message]) async {
   final webSocketChannel = onlinePlayers[username];
   if (webSocketChannel != null) {
     // Notify other players about the player exit
-   // broadcastOnlineUsers();
-    scheduleBroadcast(username);
+    broadcastOnlineUsers();
 
     // Send updated game session list to all online players
     for (var playerSocket in onlinePlayers.values) {
       if (playerSocket != webSocketChannel) { // Avoid sending to the user who exited
-        sendGameSessionUserList(playerSocket,username);
+        sendGameSessionUserList(playerSocket);
       }
     }
 
@@ -589,13 +570,12 @@ void handlePlayerExit(String username, [Map<String, dynamic>? message]) async {
   final webSocketChannel = onlinePlayers[username];
   if (webSocketChannel != null) {
     // Notify other players about the player exit
-    //broadcastOnlineUsers();
-    scheduleBroadcast(username);
+    broadcastOnlineUsers();
 
     // Send updated game session list to all online players
     for (var playerSocket in onlinePlayers.values) {
       if (playerSocket != webSocketChannel) { // Avoid sending to the user who exited
-        sendGameSessionUserList(playerSocket,username);
+        sendGameSessionUserList(playerSocket);
       }
     }
 
@@ -611,8 +591,6 @@ void handlePlayerExit(String username, [Map<String, dynamic>? message]) async {
 void handleInviteUser(String username, Map<String, dynamic> message, WebSocket socket) {
   final opponent = message['opponent'] as String?;
   final bettingAmount = message['bettingAmount'] as String?;
-  final time = message['time'] as String?;
-
 
   if (opponent != null && !activePlayers.contains(opponent)) {
     if (!activePlayers.contains(username)) {
@@ -620,7 +598,6 @@ void handleInviteUser(String username, Map<String, dynamic> message, WebSocket s
         'type': 'game_invitation',
         'opponent': username,
         'bettingAmount': bettingAmount,
-        'time':time,
       }));
       print('Sent game invitation from $username to $opponent');
     } else {
@@ -708,7 +685,7 @@ Future<void> startMatchmaking() async {
 }
 
 
-void handleWebSocketConnection(WebSocket webSocket,  Map<String, dynamic> message, String sessionToken) async {
+void handleWebSocketConnection(WebSocket webSocket, Map<String, dynamic> message, String sessionToken) async {
   print('Incoming message: $message');
 
   // Authenticate user using session token obtained from the client's message
@@ -739,8 +716,7 @@ void handleWebSocketConnection(WebSocket webSocket,  Map<String, dynamic> messag
 
       // Notify the server that the player is online
       updateOnlineStatus(user.username, true);
-      //broadcastOnlineUsers();
-      scheduleBroadcast(user.username);
+      broadcastOnlineUsers();
 
     } else {
       print('Failed to authenticate user with session token: $sessionToken');
@@ -764,8 +740,7 @@ void handleWebSocketDisconnection(String username, String sessionToken) async {
       // Update user's online status
       updateOnlineStatus(username, false);
       // Broadcast updated list of online users
-      //broadcastOnlineUsers();
-      scheduleBroadcast(username);
+      broadcastOnlineUsers();
       try {
         //await webSocketChannel.close(); // Close the WebSocket channel
         //print('WebSocket channel closed for user: $username');
@@ -847,85 +822,65 @@ Future<User?> authenticateUser(String sessionToken, WebSocket socket) async {
   }
   return null;
 }
-// Set a rate limit for broadcasting updates
-Duration broadcastInterval = const Duration(seconds: 3);
-Timer? broadcastTimer;
-Set<String> changedUsers = {};
 void broadcastOnlineUsers() async {
   // Fetch betting data (amounts and times) for all online users
-  final bettingData = await fetchBettingamount_and_timeDataFromServer(
+  final bettingData = await fetchBettingDataFromServer(
       userSessions.values
           .where((user) => onlinePlayers.containsKey(user.username))
           .map((user) => user.username)
           .toList()
   );
 
-  // Create a set of online users with their betting data
+  // Use a Set to automatically remove duplicates
   final onlineUsernamesSet = bettingData.keys.toSet();
 
-  // List to store users with closed WebSockets for removal after iteration
-  final usersToRemove = <String>[];
+  // Make a copy of onlinePlayers entries to avoid modifying the map while iterating
+  final channelsToSend = List.from(onlinePlayers.entries);
 
-  // Broadcast the update to all clients, ensuring the message is sent only once per user
-  onlinePlayers.forEach((ownUsername, channel) {
-    // Determine betting data for the current user
+  print('Broadcasting online users with betting data: $onlineUsernamesSet, $bettingData');
+
+  for (final entry in channelsToSend) {
+    final ownUsername = entry.key;
+    final channel = entry.value;
+
+    // Determine the betting data of the current user
     final ownBettingData = bettingData[ownUsername];
 
-    // Create a set of usernames with the same betting amount and selected time, excluding the owner
-    final usernamesToSend = onlineUsernamesSet.where((username) =>
+    // Create a new set of usernames with the same betting amount and selected time, excluding the owner's username
+    final usernamesToSend = onlineUsernamesSet
+        .where((username) =>
     username != ownUsername &&
         bettingData[username]?['betting_amount'] == ownBettingData?['betting_amount'] &&
         bettingData[username]?['selected_time'] == ownBettingData?['selected_time']
     ).toSet();
 
-    // Add users from matchmakingQueue as online users
+    // Add usernames from 'other_players_for_matching' list as online users
     usernamesToSend.addAll(matchmakingQueue.where((username) => username != ownUsername));
 
     final message = {
       'type': 'online_users',
-      'usernames': usernamesToSend.toList(), // Convert set back to list
-      'betting_data': bettingData,
+      'usernames': usernamesToSend.toList(), // Convert set back to a list
+      'betting_data' : bettingData,
       'other_players_for_matching': matchmakingQueue,
     };
 
     try {
       if (channel.readyState == WebSocket.open) {
-        // Send the message to the WebSocket
         channel.add(json.encode(message));
         print('Online users message sent to channel: $channel for user $ownUsername');
       } else {
-        // Mark the user for removal if WebSocket is closed
         print('WebSocket closed for channel: $channel');
-        usersToRemove.add(ownUsername);
+        // Remove closed WebSocket from onlinePlayers map
+        onlinePlayers.remove(ownUsername);
       }
     } catch (error) {
       print('Error sending online users message to channel: $error');
-      usersToRemove.add(ownUsername);  // Mark the user for removal in case of an error
+      // Handle error gracefully, e.g., remove WebSocket from onlinePlayers
+      onlinePlayers.remove(ownUsername);
     }
-  });
-
-  // Remove users whose WebSockets were closed
-  for (var username in usersToRemove) {
-    onlinePlayers.remove(username);
   }
 }
-
-// Function to throttle the broadcast rate and avoid overloading the clients
-void scheduleBroadcast(String username) {
-  changedUsers.add(username);
-
-  // If a broadcast is already scheduled, return
-  if (broadcastTimer != null && broadcastTimer!.isActive) return;
-
-  // Schedule the next broadcast
-  broadcastTimer = Timer(broadcastInterval, () {
-    print('Broadcasting online users to all connected clients');
-    broadcastOnlineUsers();
-    changedUsers.clear();
-  });
-}
-
-Future<Map<String, Map<String, dynamic>>> fetchBettingamount_and_timeDataFromServer(List<String> usernames) async {
+Future<Map<String, Map<String, dynamic>>> fetchBettingDataFromServer(List<String> usernames) async {
   final bettingData = <String, Map<String, dynamic>>{};
   try {
     final response = await http.post(

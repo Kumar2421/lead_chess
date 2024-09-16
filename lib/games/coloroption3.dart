@@ -8,6 +8,10 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'LocalGamepage3.dart';
 import 'package:get_it/get_it.dart';
 import 'game_logic.dart';
+<<<<<<< HEAD
+=======
+import 'package:shared_preferences/shared_preferences.dart';
+>>>>>>> d93d3c4 (Initial commit)
 
 final logic = GetIt.instance<GameLogic>();
 const String testDevice = 'YOUR_DEVICE_ID';
@@ -32,20 +36,60 @@ class _ColorOption3State extends State<ColorOption3> {
     setState(() {
       // Show loading screen immediately
     });
+<<<<<<< HEAD
 
     // Simulate some delay (e.g., network request) before starting the game
     Future.delayed(const Duration(seconds: 1), () {
+=======
+// Import SharedPreferences package
+
+// Simulate some delay (e.g., network request) before starting the game
+    Future.delayed(const Duration(seconds: 1), () async {
+>>>>>>> d93d3c4 (Initial commit)
       final random = Random();
       final isBlack = random.nextBool(); // Randomly selects true (Black) or false (White)
 
       logic.args.asBlack = isBlack;
       AudioHelper.buttonClickSound();
+<<<<<<< HEAD
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => const LocalGamepage3(selectedTime: 20,),
         ),
       );
+=======
+
+      // Store the player's and opponent's color in SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String playerColor;
+      String opponentColor;
+
+      // Set and print the player's color based on the random selection
+      if (isBlack) {
+        playerColor = 'black';
+        opponentColor = 'white';
+      } else {
+        playerColor = 'white';
+        opponentColor = 'black';
+      }
+
+      await prefs.setString('selected_color', playerColor);
+      await prefs.setString('opponent_color', opponentColor);
+
+      // Print the colors
+      print('Player color: $playerColor');
+      print('Opponent color: $opponentColor');
+
+      // Proceed to start the game and navigate to the next screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LocalGamepage3(selectedTime: 20),
+        ),
+      );
+
+>>>>>>> d93d3c4 (Initial commit)
       logic.start();
     });
   }

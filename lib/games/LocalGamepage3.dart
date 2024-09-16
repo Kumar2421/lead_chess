@@ -53,7 +53,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
   //List<User1> users = [];
   Users currentUser = Get.find<CurrentUser>().users;
   late String playerName = '';
-  late Timer _heartbeatTimer;
+  //late Timer _heartbeatTimer;
   bool _isOpponentOnline = true;
   String? _userId;
   Timer _offlineTimer = Timer(Duration.zero, () {});  bool _isDialogShown = false;
@@ -71,7 +71,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
   void initState() {
     logic.addListener(update);
     super.initState();
-    startHeartbeat();
+   // startHeartbeat();
     webSocketManager = GetIt.instance<WebSocketManager>(); // Retrieve the instance here
     Wakelock.enable();
     //initializeWebSocket();
@@ -83,28 +83,28 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
   Future<void> initializePrefs() async {
     prefs = await SharedPreferences.getInstance();
   }
-
-  void startHeartbeat() {
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (webSocketManager == null) {
-        setState(() {
-          _isOpponentOnline = false;
-        });
-        _heartbeatTimer.cancel();
-      } else {
-        // Send ping message as JSON
-        webSocketManager.send(json.encode({
-          'type': 'ping',
-          'sessionToken': userData['session_token'] ?? '',
-          'username': playerName,
-        }));
-
-        // Assume opponent is offline until pong is received
-        _isOpponentOnline = false;
-      }
-
-    });
-  }
+  //
+  // void startHeartbeat() {
+  //   _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+  //     if (webSocketManager == null) {
+  //       setState(() {
+  //         _isOpponentOnline = false;
+  //       });
+  //       _heartbeatTimer.cancel();
+  //     } else {
+  //       // Send ping message as JSON
+  //       webSocketManager.send(json.encode({
+  //         'type': 'ping',
+  //         'sessionToken': userData['session_token'] ?? '',
+  //         'username': playerName,
+  //       }));
+  //
+  //       // Assume opponent is offline until pong is received
+  //       _isOpponentOnline = false;
+  //     }
+  //
+  //   });
+  // }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -127,7 +127,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
       _isOpponentOnline = false;
     });
 // Stop sending ping messages
-    _heartbeatTimer?.cancel();
+    //_heartbeatTimer?.cancel();
   }
 
   void _handleAppResumed() {
@@ -143,7 +143,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
       _isOpponentOnline = true;
     });
     // Restart heartbeat
-    startHeartbeat();
+   // startHeartbeat();
   }
   Future<void> loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -253,30 +253,43 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                         content: const Text('You Win!'),
                         actions: [
                           TextButton(
-                            onPressed: () {
+                            onPressed: () async {
                               final prefs = GetIt.instance<SharedPreferences>();
+                              // Perform the cleanup
+                              await prefs.remove('opponent');
+                              print('Opponent removed from SharedPreferences');
+                              await prefs.remove('starting_ai');
+                              print('AI removed from SharedPreferences');
+                              await prefs.remove('selected_color');
+                              print('Selected color removed from SharedPreferences');
+                              await prefs.remove('game_mode');
+                              print('Game mode removed from SharedPreferences');
+                              await prefs.remove('selected_time');
+                              print('selected_time removed from SharedPreferences');
+
                               String? sessionToken = prefs.getString('sessionToken');
 
-                          final exitMessage = json.encode({
-                          'type': 'player_exit',
-                          //'username': playerName,
-                          'sessionToken': sessionToken ,// Replace with the actual current player username
-                          });
+                              final exitMessage = json.encode({
+                              'type': 'game_end',
+                              //'username': playerName,
+                              'sessionToken': sessionToken ,// Replace with the actual current player username
+                              });
 
-                          // Debug: print the message before sending
-                          print('Sending exit message: $exitMessage');
+                              // Debug: print the message before sending
+                              print('Sending exit message: $exitMessage');
 
 
-                          webSocketManager.send(exitMessage);
+                              webSocketManager.send(exitMessage);
+                              sendwinningAmountToDatabase();
                               Navigator.push(context, MaterialPageRoute(
                                   builder: (context) => const Homepage()));
                               // Handle any additional cleanup or navigation
-                              getGameResultMessage();
+                              //getGameResultMessage();
                               logic.clear();
                               // Navigator.popUntil(context, (route) => route.isFirst);
                               logic.player1Timer.stop();
                               logic.player2Timer.stop();
-                              _heartbeatTimer.cancel();
+                             // _heartbeatTimer.cancel();
                               WidgetsBinding.instance.removeObserver(this);
                               _offlineTimer.cancel();
                               print(" calling getGameResultMessage()");
@@ -308,30 +321,92 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
       }
     }
   }
-
   String getGameResultMessage() {
     String? selectedColor = prefs.getString('selected_color')?.toLowerCase() ?? 'unknown';
     String? result = prefs.getString('game_result')?.toLowerCase() ?? 'unknown';
+    String? opponentColor = prefs.getString('opponent_color')?.toLowerCase() ?? 'unknown';
 
+
+    if (opponentColor == 'unknown') {
+      // Handle the case when selectedColor is null or not set
+      print("selectedColor was not set in preferences.");
+    }
+
+    if (selectedColor == 'unknown') {
+      // Handle the case when selectedColor is null or not set
+      print("selectedColor was not set in preferences.");
+    }
+
+    if (result == 'unknown') {
+      // Handle the case when result is null or not set
+      print("game_result was not set in preferences.");
+    }
     if (result == 'draw') {
-      senddrowAmountToDatabase(currentUser.userId);
+      senddrowAmountToDatabase();
       return 'It\'s a Draw!';
     } else if (result.contains('wins')) {
-      if ((selectedColor == 'black' && result.contains('black')) ||
-          (selectedColor == 'white' && result.contains('white'))) {
-        sendwinningAmountToDatabase(currentUser.userId);
+      if ((opponentColor == 'black' && result.contains('black')) ||
+          (opponentColor == 'white' && result.contains('white'))) {
+        sendwinningAmountToDatabase();
         return 'You Win!';
       } else {
+        sendLosingAmountToDatabase();
         return 'You Lose!';
       }
     } else {
+      sendLosingAmountToDatabase();
       return 'You Lose!';
     }
   }
-  Future<void> senddrowAmountToDatabase(String userId) async {
+
+
+  Future<void> sendwinningAmountToDatabase() async {
+    const url = 'https://schmidivan.com/Esakki/ChessGame/ending_bot_winning_amount';
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedBettingAmount = prefs.getString('bettingAmount');
+    String? aiopponent = prefs.getString('starting_ai');
+
+    if (storedBettingAmount == null) {
+      print('No betting amount found in SharedPreferences.');
+      return;
+    }
+
+    final originalAmount = double.parse(storedBettingAmount.split(' ')[0]);
+    final discountedAmount = (originalAmount - (originalAmount * 0.15)) * 2; // Applying 15% discount and multiplying by 2
+    print('Sending user_id: $aiopponent and betting_amount: $discountedAmount');
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'name': aiopponent, // Assuming currentUser.userId is a string
+          'betting_amount': discountedAmount.toString(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          print('Game data sent successfully: $discountedAmount,response: ${response.body}');
+          print('Server response: ${responseData['message']}');
+        } else {
+          print('Failed to update game data: ${responseData['message']}');
+        }
+      } else {
+        print('Failed to send game data. HTTP status: ${response.statusCode}, response: ${response.body}');
+      }
+    } catch (e) {
+      print('Error sending game data: $e');
+    }
+  }
+
+  Future<void> senddrowAmountToDatabase() async {
     const url = 'https://schmidivan.com/Esakki/ChessGame/ending_winning_amount';
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? storedBettingAmount = prefs.getString('bettingAmount');
+    String? aiopponent = prefs.getString('starting_ai');
 
     if (storedBettingAmount == null) {
       print('No betting amount found in SharedPreferences.');
@@ -343,16 +418,25 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
     try {
       final response = await http.post(
         Uri.parse(url),
-        body: {
-          'user_id': userId,
-          'betting_amount': discountedAmount.toString(),
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          'name': aiopponent, // Assuming currentUser.userId is a string
+          'betting_amount': discountedAmount.toString(),
+        }),
       );
 
       if (response.statusCode == 200) {
-        print('Game data sent successfully: $email, $discountedAmount');
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          print('Game data sent successfully: $discountedAmount');
+          print('Server response: ${responseData['message']}');
+        } else {
+          print('Failed to update game data: ${responseData['message']}');
+        }
       } else {
-        print('Failed to send game data. HTTP status: ${response.statusCode}');
+        print('Failed to send game data. HTTP status: ${response.statusCode}, response: ${response.body}');
       }
     } catch (e) {
       print('Error sending game data: $e');
@@ -360,10 +444,13 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
   }
 
 
-  Future<void> sendwinningAmountToDatabase(String userId) async {
-    const url = 'https://schmidivan.com/Esakki/ChessGame/ending_winning_amount';
+
+
+  Future<void> sendLosingAmountToDatabase() async {
+    const url = 'https://schmidivan.com/Esakki/ChessGame/ending_losing_amount';
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? storedBettingAmount = prefs.getString('bettingAmount');
+    String? aiopponent = prefs.getString('starting_ai');
 
     if (storedBettingAmount == null) {
       print('No betting amount found in SharedPreferences.');
@@ -371,21 +458,29 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
     }
 
     final originalAmount = double.parse(storedBettingAmount.split(' ')[0]);
-    final discountedAmount = (originalAmount - (originalAmount * 0.15)) * 2; // Applying 15% discount and multiplying by 2
-
+    final discountedAmount = originalAmount ; // Applying 15% discount and multiplying by 2
     try {
       final response = await http.post(
         Uri.parse(url),
-        body: {
-          'user_id': userId,
-          'betting_amount': discountedAmount.toString(),
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          'name': aiopponent,
+          'betting_amount': discountedAmount.toString(),
+        }),
       );
 
       if (response.statusCode == 200) {
-        print('Game data sent successfully: $discountedAmount');
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          print('Game data sent successfully: $discountedAmount');
+          print('Server response: ${responseData['message']}');
+        } else {
+          print('Failed to update game data: ${responseData['message']}');
+        }
       } else {
-        print('Failed to send game data. HTTP status: ${response.statusCode}');
+        print('Failed to send game data. HTTP status: ${response.statusCode}, response: ${response.body}');
       }
     } catch (e) {
       print('Error sending game data: $e');
@@ -405,7 +500,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
     //   _offlineTimer.cancel();
     // }
     // _heartbeatTimer.cancel();
-    _heartbeatTimer.cancel();
+   // _heartbeatTimer.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _offlineTimer.cancel();
   }
@@ -561,7 +656,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       'assets/background_image1.jpeg',
                       fit: BoxFit.cover,
                     ),
-                  ),
+                  ), _buildTimers(),
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: logic.args.isMultiplayer
@@ -582,7 +677,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       'assets/background1.jpeg',
                       fit: BoxFit.cover,
                     ),
-                  ),
+                  ), _buildTimers(),
                   Align(
                     alignment: Alignment.topCenter,
                     child: logic.args.isMultiplayer
@@ -640,7 +735,8 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       print('Selected color removed from SharedPreferences');
                       await prefs.remove('game_mode');
                       print('Game mode removed from SharedPreferences');
-
+                      await prefs.remove('selected_time');
+                      print('selected_time removed from SharedPreferences');
                       String? sessionToken = prefs.getString('sessionToken');
 
 
@@ -661,7 +757,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       // Navigator.popUntil(context, (route) => route.isFirst);
                       logic.player1Timer.stop();
                       logic.player2Timer.stop();
-                      _heartbeatTimer.cancel();
+                      //_heartbeatTimer.cancel();
                       WidgetsBinding.instance.removeObserver(this);
                       _offlineTimer.cancel();
                       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>const HomeScreen()));
@@ -702,6 +798,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
     // Save the result to SharedPreferences
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('game_result', result);
+    getGameResultMessage();
     showDialog(
         context: context,
         barrierDismissible: false,
@@ -729,6 +826,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       //_showInterstitialAd();
                       AudioHelper.buttonClickSound();
                       logic.clear();
+
                       final prefs = GetIt.instance<SharedPreferences>();
                       // Perform the cleanup
                       await prefs.remove('opponent');
@@ -739,7 +837,8 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       print('Selected color removed from SharedPreferences');
                       await prefs.remove('game_mode');
                       print('Game mode removed from SharedPreferences');
-
+                      await prefs.remove('selected_time');
+                      print('selected_time removed from SharedPreferences');
                       String? sessionToken = prefs.getString('sessionToken');
 
 
@@ -759,7 +858,7 @@ class _LocalGamepage3State extends State<LocalGamepage3>with WidgetsBindingObser
                       logic.player1Timer.stop();
                       logic.player2Timer.stop();
                       logic.clear();
-                      _heartbeatTimer.cancel();
+                      //_heartbeatTimer.cancel();
                       WidgetsBinding.instance.removeObserver(this);
                       _offlineTimer.cancel();
                       Navigator.pushReplacement(context, MaterialPageRoute(

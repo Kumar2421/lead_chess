@@ -382,20 +382,32 @@ class GameLogicImplementation extends GameLogic {
     }
     return isValid;
   }
+
   @override
   void maybeCallAI() async {
     if (!gameOver() && !args.isMultiplayer && !(args.asBlack == (chess.turn == PieceColor.BLACK))) {
-      while (!ai.isReady()) {
-        await Future.delayed(const Duration(seconds: 1));
-      }
-      var move = await ai.compute(chess.fen, args.difficultyOfAI, 1000);
-      _move({'from': move[0]+move[1],
-        'to': move[2]+move[3],
-        'promotion': move.length == 5 ? move[4] : null});
+      // Introduce a delay before AI calculates its move
+      await Future.delayed(const Duration(seconds: 2)); // Adjust this to the desired AI delay
 
-      notifyListeners();
+      // Wait until AI is ready to compute the move
+      while (!ai.isReady()) {
+        await Future.delayed(const Duration(milliseconds: 500)); // Check every 500ms if AI is ready
+      }
+
+      // Compute the move
+      var move = await ai.compute(chess.fen, args.difficultyOfAI, 1000);
+
+      // Make the AI move
+      _move({
+        'from': move[0] + move[1],
+        'to': move[2] + move[3],
+        'promotion': move.length == 5 ? move[4] : null
+      });
+
+      notifyListeners(); // Notify listeners after AI move
     }
   }
+
 
   @override
   void promote(Piece? selectedPiece) {
@@ -532,8 +544,9 @@ class GameLogicImplementation extends GameLogic {
     this.previousMove = previousMove;
     this.promotionMove = promotionMove;
 
-
     notifyListeners();
+    _startTimerForCurrentPlayer();
+
   }
 
   bool isAnyTimerFinished() {
@@ -568,8 +581,6 @@ class GameLogicImplementation extends GameLogic {
           }
 
           // Start the timer when a piece is clicked
-          _startTimerForCurrentPlayer();
-          print('Timer started for the current player');
 
           if (index == selectedTile) {
             print('Deselecting the piece at $index');
@@ -583,6 +594,8 @@ class GameLogicImplementation extends GameLogic {
             } else {
               print('Making a move from $selectedTile to $index');
               makeMove(selectedTile!, index);
+              //_startTimerForCurrentPlayer();
+              print('Timer started for the current player');
               select(null); // Deselect after move
             }
           } else if (chess.get(index)?.color == chess.turn) {

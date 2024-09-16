@@ -171,6 +171,15 @@ class _PlayOnline2State extends State<PlayOnline2>with TickerProviderStateMixin 
     }
   }
 
+<<<<<<< HEAD
+=======
+// Function to save the selected time into shared preferences
+  Future<void> saveSelectedTime(int selectedTime) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('selected_time', selectedTime);
+  }
+
+>>>>>>> d93d3c4 (Initial commit)
 
   @override
   Widget build(BuildContext context) {
@@ -345,8 +354,17 @@ class _PlayOnline2State extends State<PlayOnline2>with TickerProviderStateMixin 
                                                     selectedIndex = index;
                                                     selectedInterval = intervals[index];
                                                     selectedTime = selectedInterval.inMinutes;
+<<<<<<< HEAD
                                                   });
                                                 },
+=======
+
+                                                    // Save the selected time into shared preferences
+                                                    saveSelectedTime(selectedTime);
+                                                  });
+                                                },
+
+>>>>>>> d93d3c4 (Initial commit)
                                               ),
                                             ]
                                         )
@@ -451,6 +469,7 @@ class _PlayOnline2State extends State<PlayOnline2>with TickerProviderStateMixin 
   }
 }
 
+<<<<<<< HEAD
 
 
 
@@ -466,3 +485,5 @@ class _PlayOnline2State extends State<PlayOnline2>with TickerProviderStateMixin 
 //           color: Colors.red,
 //           child: const Text("Hello flutter")),);
 // })
+=======
+>>>>>>> d93d3c4 (Initial commit)

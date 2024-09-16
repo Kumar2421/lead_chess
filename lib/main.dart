@@ -41,7 +41,11 @@ Future<void> main() async {
   await NotificationService.initializeLocalNotifications();
 
   final webSocketManager = WebSocketManager();
+<<<<<<< HEAD
   await webSocketManager.init('ws://93.127.206.44:3007');  // Ensure initialization here
+=======
+  await webSocketManager.init('ws://192.168.29.209:3007');  // Ensure initialization here
+>>>>>>> d93d3c4 (Initial commit)
   GetIt.instance.registerSingleton<WebSocketManager>(webSocketManager);
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -101,7 +105,12 @@ class MyApp extends StatelessWidget {
                     return LocalGame1(selectedTime: selectedTime);
                   },
                   '/localGame2': (context) => const LocalGame2(),
+<<<<<<< HEAD
                   '/game': (context) => const GameScreen(),
+=======
+                  '/game': (context){ final args = ModalRoute.of(context)!.settings.arguments;
+              final selectedTime = args is int ? args : 1; return GameScreen(selectedTime: selectedTime);},
+>>>>>>> d93d3c4 (Initial commit)
                 },
               );
             } else {
@@ -132,7 +141,11 @@ class MyApp extends StatelessWidget {
     final webSocketManager = GetIt.instance<WebSocketManager>();
 
     if (!webSocketManager.isInitialized) {
+<<<<<<< HEAD
       const url = 'ws://93.127.206.44:3007';
+=======
+      const url = 'ws://192.168.29.209:3007';
+>>>>>>> d93d3c4 (Initial commit)
       await webSocketManager.init(url);
     }
 

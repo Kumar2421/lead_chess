@@ -27,7 +27,9 @@ import 'game_logic.dart';
 final logic = GetIt.instance<GameLogic>();
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  final int selectedTime;
+
+  const GameScreen({super.key, required this.selectedTime});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -47,7 +49,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
   late String email = '';
   late SharedPreferences prefs;
   late WebSocketManager webSocketManager;
-  late Timer _heartbeatTimer;
+  //late Timer _heartbeatTimer;
 
 
   @override
@@ -58,7 +60,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
     webSocketManager = GetIt.instance<WebSocketManager>(); // Retrieve the instance here
     loadUserData();
     initializePrefs();
-    startHeartbeat();
+    //startHeartbeat();
     setupWebSocket();
   }
 
@@ -66,6 +68,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
     prefs = await SharedPreferences.getInstance();
   }
 
+  Future<void> loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String name = _currentUser.users.name;
+    String? userDataString = prefs.getString('userData');
+
+    //final String? opponent = await getOpponentName();
+    if (userDataString != null) {
+      setState(() {
+        playerName = userData['name'] ?? 'Player';
+        userData = jsonDecode(userDataString);
+      });
+    }
+    playerName=name;
+  }
 
   void setupWebSocket() {
     // Check if webSocketManager is initialized
@@ -112,9 +128,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
         sendwinningAmountToDatabase(currentUser.userId);
         return 'You Win!';
       } else {
+        sendLosingAmountToDatabase(currentUser.userId);
         return 'You Lose!';
       }
     } else {
+      sendLosingAmountToDatabase(currentUser.userId);
       return 'You Lose!';
     }
   }
@@ -130,59 +148,42 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
       return;
     }
 
+    if (currentUser?.userId == null) {
+      print('No currentUser.userId found.');
+      return;
+    }
+
     final originalAmount = double.parse(storedBettingAmount.split(' ')[0]);
     final discountedAmount = (originalAmount - (originalAmount * 0.15)) * 2; // Applying 15% discount and multiplying by 2
-
+    print('Sending user_id: ${currentUser.userId} and betting_amount: $discountedAmount');
     try {
       final response = await http.post(
         Uri.parse(url),
-        body: {
-          'user_id': userId,
-          'betting_amount': discountedAmount.toString(),
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          'user_id': currentUser.userId.toString(), // Assuming currentUser.userId is a string
+          'betting_amount': discountedAmount.toString(),
+        }),
       );
 
       if (response.statusCode == 200) {
-        print('Game data sent successfully: $discountedAmount');
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          print('Game data sent successfully: $discountedAmount');
+          print('Server response: ${responseData['message']}');
+        } else {
+          print('Failed to update game data: ${responseData['message']}');
+        }
       } else {
-        print('Failed to send game data. HTTP status: ${response.statusCode}');
+        print('Failed to send game data. HTTP status: ${response.statusCode}, response: ${response.body}');
       }
     } catch (e) {
       print('Error sending game data: $e');
     }
   }
-  //
-  // Future<void> sendLosingAmountToDatabase(String userId) async {
-  //   const url = 'https://schmidivan.com/Esakki/ChessGame/ending_winning_amount';
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   String? storedBettingAmount = prefs.getString('bettingAmount');
-  //
-  //   if (storedBettingAmount == null) {
-  //     print('No betting amount found in SharedPreferences.');
-  //     return;
-  //   }
-  //
-  //   final originalAmount = double.parse(storedBettingAmount.split(' ')[0]);
-  //   //final discountedAmount = originalAmount ; // Applying 15% discount and multiplying by 2
-  //
-  //   try {
-  //     final response = await http.post(
-  //       Uri.parse(url),
-  //       body: {
-  //         'user_id': userId,
-  //         'betting_amount': originalAmount.toString(),
-  //       },
-  //     );
-  //
-  //     if (response.statusCode == 200) {
-  //       print('Game data sent successfully: $email, $originalAmount');
-  //     } else {
-  //       print('Failed to send game data. HTTP status: ${response.statusCode}');
-  //     }
-  //   } catch (e) {
-  //     print('Error sending game data: $e');
-  //   }
-  // }
+
   Future<void> senddrowAmountToDatabase(String userId) async {
     const url = 'https://schmidivan.com/Esakki/ChessGame/ending_winning_amount';
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -198,42 +199,93 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
     try {
       final response = await http.post(
         Uri.parse(url),
-        body: {
-          'user_id': userId,
-          'betting_amount': discountedAmount.toString(),
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          'user_id': currentUser.userId.toString(), // Assuming currentUser.userId is a string
+          'betting_amount': discountedAmount.toString(),
+        }),
       );
 
       if (response.statusCode == 200) {
-        print('Game data sent successfully: $email, $discountedAmount');
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          print('Game data sent successfully: $discountedAmount');
+          print('Server response: ${responseData['message']}');
+        } else {
+          print('Failed to update game data: ${responseData['message']}');
+        }
       } else {
-        print('Failed to send game data. HTTP status: ${response.statusCode}');
+        print('Failed to send game data. HTTP status: ${response.statusCode}, response: ${response.body}');
       }
     } catch (e) {
       print('Error sending game data: $e');
     }
   }
-  void startHeartbeat() {
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-        if (webSocketManager == null) {
-          setState(() {
-            _isOpponentOnline = false;
-          });
-          _heartbeatTimer.cancel();
+
+
+
+  Future<void> sendLosingAmountToDatabase(String userId) async {
+    const url = 'https://schmidivan.com/Esakki/ChessGame/ending_losing_amount';
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedBettingAmount = prefs.getString('bettingAmount');
+
+    if (storedBettingAmount == null) {
+      print('No betting amount found in SharedPreferences.');
+      return;
+    }
+
+    final originalAmount = double.parse(storedBettingAmount.split(' ')[0]);
+    final discountedAmount = originalAmount ; // Applying 15% discount and multiplying by 2
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'user_id': currentUser.userId.toString(), // Assuming currentUser.userId is a string
+          'betting_amount': discountedAmount.toString(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          print('Game data sent successfully: $discountedAmount');
+          print('Server response: ${responseData['message']}');
         } else {
-          // Send ping message as JSON
-          webSocketManager.send(json.encode({
-            'type': 'ping',
-            'sessionToken': userData['session_token'] ?? '',
-            'username': playerName,
-          }));
-
-          // Assume opponent is offline until pong is received
-          _isOpponentOnline = false;
+          print('Failed to update game data: ${responseData['message']}');
         }
-
-    });
+      } else {
+        print('Failed to send game data. HTTP status: ${response.statusCode}, response: ${response.body}');
+      }
+    } catch (e) {
+      print('Error sending game data: $e');
+    }
   }
+  // void startHeartbeat() {
+  //   _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+  //       if (webSocketManager == null) {
+  //         setState(() {
+  //           _isOpponentOnline = false;
+  //         });
+  //         _heartbeatTimer.cancel();
+  //       } else {
+  //         // Send ping message as JSON
+  //         webSocketManager.send(json.encode({
+  //           'type': 'ping',
+  //           'sessionToken': userData['session_token'] ?? '',
+  //           'username': playerName,
+  //         }));
+  //
+  //         // Assume opponent is offline until pong is received
+  //         _isOpponentOnline = false;
+  //       }
+  //
+  //   });
+  // }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -256,7 +308,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
       _isOpponentOnline = false;
     });
 // Stop sending ping messages
-    _heartbeatTimer?.cancel();
+   // _heartbeatTimer?.cancel();
   }
 
   void _handleAppResumed() {
@@ -272,23 +324,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
       _isOpponentOnline = true;
     });
     // Restart heartbeat
-    startHeartbeat();
+   // startHeartbeat();
   }
 
-  Future<void> loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String name = _currentUser.users.name;
-    String? userDataString = prefs.getString('userData');
-
-    //final String? opponent = await getOpponentName();
-    if (userDataString != null) {
-      setState(() {
-        playerName = userData['name'] ?? 'Player';
-        userData = jsonDecode(userDataString);
-      });
-    }
-    playerName=name;
-  }
 
 
   void handlePlayerExit(Map<String, dynamic> message) {
@@ -324,11 +362,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                       print('Selected color removed from SharedPreferences');
                       await prefs.remove('game_mode');
                       print('Game mode removed from SharedPreferences');
+                      await prefs.remove('selected_time');
+                      print('selected_time removed from SharedPreferences');
 
                       String? sessionToken = prefs.getString('sessionToken');
 
                       final exitMessage = json.encode({
-                        'type': 'player_exit',
+                        'type': 'game_end',
                         'username': playerName,
                         'sessionToken': sessionToken ,// Replace with the actual current player username
                       });
@@ -338,13 +378,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
 
 
                       webSocketManager.send(exitMessage);
-                      getGameResultMessage();
+                      sendwinningAmountToDatabase(currentUser.userId);
+
+//                      getGameResultMessage();
                       logic.clear();
                       // Navigator.popUntil(context, (route) => route.isFirst);
                       logic.player1Timer.stop();
                       logic.player2Timer.stop();
-                      _heartbeatTimer.cancel();
-                      _heartbeatTimer.cancel();
+                      // _heartbeatTimer.cancel();
+                      // _heartbeatTimer.cancel();
                       WidgetsBinding.instance.removeObserver(this);
                       _offlineTimer.cancel();
                       Navigator.push(context, MaterialPageRoute(builder: (context)=> const HomeScreen()));
@@ -419,7 +461,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                               print('Selected color removed from SharedPreferences');
                               await prefs.remove('game_mode');
                               print('Game mode removed from SharedPreferences');
-
+                              await prefs.remove('selected_time');
+                              print('selected_time removed from SharedPreferences');
                               String? sessionToken = prefs.getString('sessionToken');
 
                               final exitMessage = json.encode({
@@ -437,8 +480,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                               // Navigator.popUntil(context, (route) => route.isFirst);
                               logic.player1Timer.stop();
                               logic.player2Timer.stop();
-                              _heartbeatTimer.cancel();
-                              _heartbeatTimer.cancel();
+                              // _heartbeatTimer.cancel();
+                              // _heartbeatTimer.cancel();
                               WidgetsBinding.instance.removeObserver(this);
                               _offlineTimer.cancel();
                               Navigator.push(context, MaterialPageRoute(
@@ -708,6 +751,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                       fit: BoxFit.cover,
                     ),
                   ),
+                  _buildTimers(),
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: logic.args.isMultiplayer
@@ -728,7 +772,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                       'assets/background1.jpeg',
                       fit: BoxFit.cover,
                     ),
-                  ),
+                  ), _buildTimers(),
                   Align(
                     alignment: Alignment.topCenter,
                     child: logic.args.isMultiplayer
@@ -762,7 +806,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                   String? sessionToken = prefs.getString('sessionToken');
 
                   final exitMessage = json.encode({
-                    'type': 'player_exit',
+                    'type': 'game_end',
                     //'username': playerName,
                     'sessionToken': sessionToken ,// Replace with the actual current player username
                   });
@@ -778,8 +822,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                   // Navigator.popUntil(context, (route) => route.isFirst);
                   logic.player1Timer.stop();
                   logic.player2Timer.stop();
-                  _heartbeatTimer.cancel();
-                  _heartbeatTimer.cancel();
+                  // _heartbeatTimer.cancel();
+                  // _heartbeatTimer.cancel();
                   WidgetsBinding.instance.removeObserver(this);
                   _offlineTimer.cancel();
                   Navigator.of(context).popUntil((route) => route.isFirst);
@@ -823,6 +867,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                       print('Selected color removed from SharedPreferences');
                       await prefs.remove('game_mode');
                       print('Game mode removed from SharedPreferences');
+                      await prefs.remove('selected_time');
+                      print('selected_time removed from SharedPreferences');
                       String? sessionToken = prefs.getString('sessionToken');
 
                       final exitMessage = json.encode({
@@ -841,8 +887,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                       // Navigator.popUntil(context, (route) => route.isFirst);
                       logic.player1Timer.stop();
                       logic.player2Timer.stop();
-                      _heartbeatTimer.cancel();
-                      _heartbeatTimer.cancel();
+                      // _heartbeatTimer.cancel();
+                      // _heartbeatTimer.cancel();
                       WidgetsBinding.instance.removeObserver(this);
                       _offlineTimer.cancel();
                       // Navigator.popUntil(context, (route) => route.isFirst);
@@ -883,23 +929,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
     // Save the result to SharedPreferences
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('game_result', result);
-
+    getGameResultMessage();
     showDialog(
         context: context,
         builder: (BuildContext context) =>
             AlertDialog(title: Text(title),actions: [
-             // TextButton(
-              //   onPressed: () {
-              //     final args = logic.args;
-              //     logic.clear();
-              //     args.asBlack = !args.asBlack;
-              //     logic.args = args;
-              //     Navigator.pop(context);
-              //     Navigator.pushNamed(context, '/game');
-              //     logic.start();
-              //   },
-              //   child: const Text("Rematch"),
-              // ),
+
               TextButton(
                 onPressed: () async {
                   logic.clear();
@@ -914,6 +949,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                   print('Selected color removed from SharedPreferences');
                   await prefs.remove('game_mode');
                   print('Game mode removed from SharedPreferences');
+                  await prefs.remove('selected_time');
+                  print('selected_time removed from SharedPreferences');
                   String? sessionToken = prefs.getString('sessionToken');
 
                   final exitMessage = json.encode({
@@ -930,7 +967,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
                   print('Sent  game_end update to server: $exitMessage');
                   logic.player1Timer.stop();
                   logic.player2Timer.stop();
-                  _heartbeatTimer.cancel();
+                  //_heartbeatTimer.cancel();
                   WidgetsBinding.instance.removeObserver(this);
                   _offlineTimer.cancel();
                   // Navigator.popUntil(context, (route) => route.isFirst);
@@ -951,7 +988,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver{
     logic.removeListener(update);
     logic.player1Timer.stop();
     logic.player2Timer.stop();
-    _heartbeatTimer.cancel();
+    //_heartbeatTimer.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _offlineTimer.cancel();
   }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:chess_game/games/game_screen.dart';
 import 'package:chess_game/games/piece_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
@@ -41,7 +42,12 @@ class _ChooseColorScreenState extends State<ChooseColorScreen2> {
     // Show loading animation for 3 seconds before navigating
     Timer(const Duration(seconds: 3), () {
       logic.args.isMultiplayer = true;
-      Navigator.pushReplacementNamed(context, '/game');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const GameScreen(selectedTime: 20),
+        ),
+      );
     });
   }
 
